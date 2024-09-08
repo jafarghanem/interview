@@ -96,27 +96,26 @@ func geturl() string {
 	return url
 }
 
-// Function to create a new user by sending a POST request to the User API
+
 func createUser(user User) (string, error) {
-	// Serialize the user data to JSON
+	
 	userJSON, err := json.Marshal(user)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal user data: %v", err)
 	}
 	createUserEndpoint := fmt.Sprintf("http://%s/api/v1/register", geturl())
-	// Create the POST request to the user registration endpoint
+	
 	resp, err := http.Post(createUserEndpoint, "application/json", bytes.NewBuffer(userJSON))
 	if err != nil {
 		return "", fmt.Errorf("failed to make POST request to register user: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// Check if the request was successful
+
 	if resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("failed to create user, status code: %d", resp.StatusCode)
 	}
 
-	// Parse the response to get the user_id
 	var result map[string]interface{}
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -126,12 +125,12 @@ func createUser(user User) (string, error) {
 		return "", fmt.Errorf("failed to unmarshal response: %v", err)
 	}
 
-	// Extract the user_id from the response
+
 	data, ok := result["data"].(map[string]interface{})
 	if !ok {
 		return "", fmt.Errorf("failed to extract data from response")
 	}
-	userID, ok := data["user_id"].(string) // Change to string if user_id is a string
+	userID, ok := data["user_id"].(string)
 	if !ok {
 		return "", fmt.Errorf("failed to extract user_id from data")
 	}
@@ -150,20 +149,20 @@ func createAddress(userID string, address Address) error {
 		"country":  address.Country,
 	}
 
-	// Serialize the address data to JSON
+
 	addressJSON, err := json.Marshal(addressData)
 	if err != nil {
 		return fmt.Errorf("failed to marshal address data: %v", err)
 	}
 	createAddressEndpoint := fmt.Sprintf("http://%s/api/v1/addressconc", geturl())
-	// Create the POST request to the address creation endpoint
+	
 	resp, err := http.Post(createAddressEndpoint, "application/json", bytes.NewBuffer(addressJSON))
 	if err != nil {
 		return fmt.Errorf("failed to make POST request to create address: %v", err)
 	}
 	defer resp.Body.Close()
 
-	// Check if the request was successful
+
 	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to create address, status code: %d", resp.StatusCode)
 	}
@@ -172,7 +171,7 @@ func createAddress(userID string, address Address) error {
 }
 
 func ProcessUser(user User) {
-	// Step 1: Create the user
+	
 	userID, err := createUser(user)
 	if err != nil {
 		log.Printf("Failed to create user: %v\n", err)
@@ -180,7 +179,7 @@ func ProcessUser(user User) {
 	}
 	fmt.Printf("User created with ID: %s\n", userID)
 
-	// Step 2: Create addresses for the user
+
 	for _, address := range user.Addresses {
 		err = createAddress(userID, address)
 		if err != nil {
@@ -191,7 +190,7 @@ func ProcessUser(user User) {
 	}
 }
 
-// Worker function that processes users from the channel
+
 func worker(id int, wg *sync.WaitGroup, usersChan <-chan User) {
 	defer wg.Done()
 
@@ -214,47 +213,46 @@ func generatefile() {
 	}
 }
 func addinfo() {
-	file, err := os.Open("users_data.json") // Path to your large JSON file
+	file, err := os.Open("users_data.json") 
 	if err != nil {
 		log.Fatalf("failed to open file: %v", err)
 	}
 	defer file.Close()
 
-	// Step 2: Initialize the JSON decoder
+
 	decoder := json.NewDecoder(file)
 
-	// Step 3: Read the opening bracket of the JSON array
+	
 	if _, err := decoder.Token(); err != nil {
 		log.Fatalf("failed to read JSON opening bracket: %v", err)
 	}
 
-	// Step 4: Create a channel to send users to workers
-	usersChan := make(chan User, 5) // Buffered channel to handle some users concurrently
+	
+	usersChan := make(chan User, 5)
 	var wg sync.WaitGroup
 
-	// Step 5: Start worker pool (using 10 workers in this example)
+	
 	numWorkers := 10
 	for i := 1; i <= numWorkers; i++ {
 		wg.Add(1)
 		go worker(i, &wg, usersChan)
 	}
 
-	// Step 6: Decode each user from the JSON file and send it to workers
+	
 	for decoder.More() {
 		var user User
-		// Decode a single user
+		
 		if err := decoder.Decode(&user); err != nil {
 			log.Fatalf("failed to decode user: %v", err)
 		}
 
-		// Send the user to the workers via the channel
+		
 		usersChan <- user
 	}
 
-	// Step 7: Close the channel to signal to workers that there's no more data
 	close(usersChan)
 
-	// Wait for all workers to finish
+	
 	wg.Wait()
 
 	fmt.Println("All users processed successfully!")
